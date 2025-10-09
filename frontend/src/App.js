@@ -333,46 +333,146 @@ function App() {
 
   // Results Screen
   if (stage === 'results') {
+    if (!results) {
+      return (
+        <div className="app-container">
+          <div className="results-screen">
+            <div className="loading">Calculando resultados...</div>
+          </div>
+        </div>
+      );
+    }
+
+    const interpretationLabels = {
+      'desinteres': 'Desinterés',
+      'bajo': 'Bajo',
+      'promedio_bajo': 'Promedio Bajo',
+      'indeciso': 'Indeciso',
+      'promedio': 'Promedio',
+      'promedio_alto': 'Promedio Alto',
+      'alto': 'Alto',
+      'muy_alto': 'Muy Alto'
+    };
+
+    const scoresArray = Object.entries(results.scores).map(([code, data]) => ({
+      code,
+      ...data
+    }));
+
     return (
-      <div className="app-container">
+      <div className="app-container results-container">
         <div className="results-screen">
+          {/* Header */}
           <div className="results-header">
             <div className="success-icon">✓</div>
             <h1>¡Test Completado!</h1>
-            <p>Has finalizado exitosamente el CASM-83 R2014</p>
+            <p>Resultados del CASM-83 R2014</p>
           </div>
 
+          {/* Gráfica de Resultados */}
           <div className="results-card">
-            <h2>Resumen de tus Respuestas</h2>
+            <h2>📊 Gráfica de Intereses por Escala</h2>
+            <p className="chart-subtitle">Cantidad de respuestas por cada área vocacional</p>
+            
+            <div className="chart-container">
+              {scoresArray.map((scale) => (
+                <div key={scale.code} className="chart-bar-row">
+                  <div className="chart-label">
+                    <span className="scale-name">{scale.name}</span>
+                    <span className="scale-score">{scale.score}/22</span>
+                  </div>
+                  <div className="chart-bar-container">
+                    <div 
+                      className="chart-bar"
+                      style={{ 
+                        width: `${(scale.score / 22) * 100}%`,
+                        background: scale.interpretation === 'muy_alto' || scale.interpretation === 'alto' 
+                          ? 'linear-gradient(90deg, #10b981, #059669)'
+                          : scale.interpretation === 'promedio_alto' || scale.interpretation === 'promedio'
+                          ? 'linear-gradient(90deg, #667eea, #764ba2)'
+                          : 'linear-gradient(90deg, #94a3b8, #64748b)'
+                      }}
+                    >
+                      <span className="chart-bar-label">
+                        {interpretationLabels[scale.interpretation]}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recomendaciones de Carreras */}
+          {results.recommendations.top_scales && results.recommendations.top_scales.length > 0 && (
+            <div className="results-card">
+              <h2>🎓 Recomendaciones Profesionales</h2>
+              <p className="recommendations-subtitle">
+                Basado en tus resultados, estas son las áreas donde mostraste mayor interés:
+              </p>
+
+              {results.recommendations.top_scales.map((rec, index) => (
+                <div key={rec.scale} className="recommendation-card">
+                  <div className="recommendation-header">
+                    <span className="recommendation-number">#{index + 1}</span>
+                    <div>
+                      <h3>{rec.name}</h3>
+                      <p className="recommendation-score">
+                        Puntuación: {rec.score}/22 - {interpretationLabels[rec.interpretation]}
+                      </p>
+                    </div>
+                  </div>
+
+                  {rec.ocupaciones && rec.ocupaciones.length > 0 && (
+                    <div className="career-section">
+                      <h4>Carreras Profesionales:</h4>
+                      <ul className="career-list">
+                        {rec.ocupaciones.map((career, i) => (
+                          <li key={i}>{career}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {rec.tecnicas && rec.tecnicas.length > 0 && (
+                    <div className="career-section">
+                      <h4>Carreras Técnicas:</h4>
+                      <ul className="career-list">
+                        {rec.tecnicas.map((career, i) => (
+                          <li key={i}>{career}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Resumen */}
+          <div className="results-card">
+            <h2>📋 Resumen</h2>
             <div className="results-stats">
               <div className="stat">
-                <div className="stat-value">{questions.length}</div>
-                <div className="stat-label">Preguntas Totales</div>
-              </div>
-              <div className="stat">
-                <div className="stat-value">{Object.keys(responses).length}</div>
+                <div className="stat-value">{results.answered_questions}</div>
                 <div className="stat-label">Preguntas Respondidas</div>
               </div>
               <div className="stat">
-                <div className="stat-value">{getProgress()}%</div>
-                <div className="stat-label">Completado</div>
+                <div className="stat-value">{results.recommendations.top_scales?.length || 0}</div>
+                <div className="stat-label">Áreas Destacadas</div>
+              </div>
+              <div className="stat">
+                <div className="stat-value">{sex === 'masculino' ? 'M' : 'F'}</div>
+                <div className="stat-label">Sexo</div>
               </div>
             </div>
 
             <div className="session-info">
               <p><strong>ID de Sesión:</strong> {sessionId}</p>
-              <p><strong>Sexo:</strong> {sex === 'masculino' ? 'Masculino' : 'Femenino'}</p>
-            </div>
-
-            <div className="info-message">
-              <p>
-                Tus respuestas han sido guardadas exitosamente en la base de datos.
-                Los resultados detallados con las escalas vocacionales y recomendaciones 
-                profesionales estarán disponibles en la siguiente fase del desarrollo.
-              </p>
             </div>
           </div>
 
+          {/* Botón de nuevo test */}
           <button 
             className="primary-btn"
             onClick={() => {
@@ -381,6 +481,7 @@ function App() {
               setSessionId('');
               setResponses({});
               setCurrentBlock(1);
+              setResults(null);
             }}
           >
             Realizar Nuevo Test
