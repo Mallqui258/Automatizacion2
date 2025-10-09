@@ -11,6 +11,7 @@ function App() {
   const [currentBlock, setCurrentBlock] = useState(1);
   const [responses, setResponses] = useState({});
   const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState(null);
 
   // Fetch questions on mount
   useEffect(() => {
