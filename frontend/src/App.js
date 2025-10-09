@@ -102,6 +102,12 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId })
       });
+      
+      // Fetch results
+      const resultsResponse = await fetch(`${BACKEND_URL}/api/results/${sessionId}`);
+      const resultsData = await resultsResponse.json();
+      setResults(resultsData);
+      
       setStage('results');
     } catch (error) {
       console.error('Error completing test:', error);
