@@ -300,3 +300,239 @@ async def get_all_sessions():
         return {"sessions": sessions, "total": len(sessions)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# CASM-83 Scoring System
+# Mapeo de preguntas a escalas
+SCALE_MAPPING = {
+    "CCFM": {
+        "name": "Ciencias Físicas Matemáticas",
+        "column": [1, 14, 27, 40, 53, 66, 79, 92, 105, 118, 131],  # Opción A
+        "row": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]  # Opción B
+    },
+    "CCSS": {
+        "name": "Ciencias Sociales",
+        "column": [2, 15, 28, 41, 54, 67, 80, 93, 106, 119, 132],
+        "row": [14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+    },
+    "CCNA": {
+        "name": "Ciencias Naturales",
+        "column": [3, 16, 29, 42, 55, 68, 81, 94, 107, 120, 133],
+        "row": [27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37]
+    },
+    "CCCO": {
+        "name": "Ciencias de la Comunicación",
+        "column": [4, 17, 30, 43, 56, 69, 82, 95, 108, 121, 134],
+        "row": [40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50]
+    },
+    "ARTE": {
+        "name": "Artes",
+        "column": [5, 18, 31, 44, 57, 70, 83, 96, 109, 122, 135],
+        "row": [53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63]
+    },
+    "BURO": {
+        "name": "Burocracia",
+        "column": [6, 19, 32, 45, 58, 71, 84, 97, 110, 123, 136],
+        "row": [66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76]
+    },
+    "CCEP": {
+        "name": "Ciencias Económicas Políticas",
+        "column": [7, 20, 33, 46, 59, 72, 85, 98, 111, 124, 137],
+        "row": [79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89]
+    },
+    "IIAA": {
+        "name": "Institutos Armados",
+        "column": [8, 21, 34, 47, 60, 73, 86, 99, 112, 125, 138],
+        "row": [92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102]
+    },
+    "FINA": {
+        "name": "Finanzas",
+        "column": [9, 22, 35, 48, 61, 74, 87, 100, 113, 126, 139],
+        "row": [105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115]
+    },
+    "LING": {
+        "name": "Lingüística",
+        "column": [10, 23, 36, 49, 62, 75, 88, 101, 114, 127, 140],
+        "row": [118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128]
+    },
+    "JURI": {
+        "name": "Jurisprudencia",
+        "column": [11, 24, 37, 50, 63, 76, 89, 102, 115, 128, 141],
+        "row": [131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141]
+    }
+}
+
+# Baremos para interpretación (Varones)
+BAREMOS_VARONES = {
+    "CCFM": {"desinteres": (0, 2), "bajo": (3, 4), "promedio_bajo": (5, 6), "indeciso": (7, 10), "promedio": (11, 13), "promedio_alto": (14, 15), "alto": (16, 17), "muy_alto": (18, 22)},
+    "CCSS": {"desinteres": (1, 3), "bajo": (4, 6), "promedio_bajo": (7, 8), "indeciso": (9, 12), "promedio": (13, 14), "promedio_alto": (15, 16), "alto": (17, 22), "muy_alto": (23, 99)},
+    "CCNA": {"desinteres": (0, 4), "bajo": (5, 7), "promedio_bajo": (8, 9), "indeciso": (10, 13), "promedio": (14, 15), "promedio_alto": (16, 18), "alto": (19, 22), "muy_alto": (23, 99)},
+    "CCCO": {"desinteres": (0, 2), "bajo": (3, 4), "promedio_bajo": (5, 6), "indeciso": (7, 10), "promedio": (11, 13), "promedio_alto": (14, 17), "alto": (18, 22), "muy_alto": (23, 99)},
+    "ARTE": {"desinteres": (0, 2), "bajo": (3, 4), "promedio_bajo": (5, 6), "indeciso": (7, 10), "promedio": (11, 14), "promedio_alto": (15, 17), "alto": (18, 22), "muy_alto": (23, 99)},
+    "BURO": {"desinteres": (0, 3), "bajo": (4, 5), "promedio_bajo": (6, 7), "indeciso": (8, 11), "promedio": (12, 13), "promedio_alto": (14, 16), "alto": (17, 22), "muy_alto": (23, 99)},
+    "CCEP": {"desinteres": (0, 3), "bajo": (4, 5), "promedio_bajo": (6, 7), "indeciso": (8, 12), "promedio": (13, 14), "promedio_alto": (15, 17), "alto": (18, 22), "muy_alto": (23, 99)},
+    "IIAA": {"desinteres": (0, 3), "bajo": (4, 5), "promedio_bajo": (6, 7), "indeciso": (8, 12), "promedio": (13, 14), "promedio_alto": (15, 17), "alto": (18, 22), "muy_alto": (23, 99)},
+    "FINA": {"desinteres": (0, 2), "bajo": (3, 4), "promedio_bajo": (5, 6), "indeciso": (7, 10), "promedio": (11, 12), "promedio_alto": (13, 16), "alto": (17, 22), "muy_alto": (23, 99)},
+    "LING": {"desinteres": (0, 2), "bajo": (3, 4), "promedio_bajo": (5, 6), "indeciso": (7, 9), "promedio": (10, 12), "promedio_alto": (13, 15), "alto": (16, 22), "muy_alto": (23, 99)},
+    "JURI": {"desinteres": (0, 2), "bajo": (3, 4), "promedio_bajo": (5, 6), "indeciso": (7, 10), "promedio": (11, 13), "promedio_alto": (14, 16), "alto": (17, 22), "muy_alto": (23, 99)}
+}
+
+# Baremos para interpretación (Mujeres)
+BAREMOS_MUJERES = {
+    "CCFM": {"desinteres": (0, 2), "bajo": (3, 4), "promedio_bajo": (5, 6), "indeciso": (7, 11), "promedio": (12, 14), "promedio_alto": (15, 17), "alto": (18, 22), "muy_alto": (23, 99)},
+    "CCSS": {"desinteres": (0, 4), "bajo": (5, 7), "promedio_bajo": (8, 9), "indeciso": (10, 14), "promedio": (15, 16), "promedio_alto": (17, 19), "alto": (20, 22), "muy_alto": (23, 99)},
+    "CCNA": {"desinteres": (0, 3), "bajo": (4, 5), "promedio_bajo": (6, 7), "indeciso": (8, 12), "promedio": (13, 14), "promedio_alto": (15, 17), "alto": (18, 22), "muy_alto": (23, 99)},
+    "CCCO": {"desinteres": (0, 2), "bajo": (3, 4), "promedio_bajo": (5, 6), "indeciso": (7, 11), "promedio": (12, 13), "promedio_alto": (14, 16), "alto": (17, 22), "muy_alto": (23, 99)},
+    "ARTE": {"desinteres": (0, 2), "bajo": (3, 4), "promedio_bajo": (5, 6), "indeciso": (7, 11), "promedio": (12, 13), "promedio_alto": (14, 16), "alto": (17, 22), "muy_alto": (23, 99)},
+    "BURO": {"desinteres": (0, 4), "bajo": (5, 7), "promedio_bajo": (8, 9), "indeciso": (10, 14), "promedio": (15, 16), "promedio_alto": (17, 19), "alto": (20, 22), "muy_alto": (23, 99)},
+    "CCEP": {"desinteres": (0, 2), "bajo": (3, 5), "promedio_bajo": (6, 7), "indeciso": (8, 12), "promedio": (13, 14), "promedio_alto": (15, 17), "alto": (18, 22), "muy_alto": (23, 99)},
+    "IIAA": {"desinteres": (0, 2), "bajo": (3, 4), "promedio_bajo": (5, 6), "indeciso": (7, 9), "promedio": (10, 12), "promedio_alto": (13, 15), "alto": (16, 22), "muy_alto": (23, 99)},
+    "FINA": {"desinteres": (0, 2), "bajo": (3, 5), "promedio_bajo": (6, 7), "indeciso": (8, 12), "promedio": (13, 14), "promedio_alto": (15, 17), "alto": (18, 22), "muy_alto": (23, 99)},
+    "LING": {"desinteres": (0, 2), "bajo": (3, 5), "promedio_bajo": (6, 7), "indeciso": (8, 12), "promedio": (13, 14), "promedio_alto": (15, 17), "alto": (18, 22), "muy_alto": (23, 99)},
+    "JURI": {"desinteres": (0, 2), "bajo": (3, 4), "promedio_bajo": (5, 6), "indeciso": (7, 11), "promedio": (12, 13), "promedio_alto": (14, 16), "alto": (17, 22), "muy_alto": (23, 99)}
+}
+
+# Carreras profesionales por escala
+CARRERAS = {
+    "CCFM": {
+        "ocupaciones": ["Ingenierías (Civil, de Sistemas, Industrial, Electrónica, de Minas, Sanitaria, Textil, Química, Mecánica)", "Arquitectura", "Matemáticas", "Física", "Meteorología", "Geografía", "Geología"],
+        "tecnicas": ["Técnico en TV y radio", "Electricista", "Mecánico automotriz", "Construcción civil", "Computación e informática", "Redes"]
+    },
+    "CCSS": {
+        "ocupaciones": ["Educación (inicial, primaria, secundaria)", "Antropología", "Sociología", "Trabajo social", "Historia", "Arqueología", "Filosofía", "Teología", "Psicología"],
+        "tecnicas": ["Auxiliar de educación"]
+    },
+    "CCNA": {
+        "ocupaciones": ["Medicina Humana", "Obstetricia", "Enfermería", "Nutrición", "Biología", "Odontología", "Químico-Farmacéutico", "Medicina Veterinaria", "Agronomía", "Zootécnia", "Psicología"],
+        "tecnicas": ["Agrotécnia", "Auxiliar de Enfermería", "Técnicos Laboratorista", "Prótesis Dental", "Visitador médico"]
+    },
+    "CCCO": {
+        "ocupaciones": ["Ciencias de la comunicación", "Periodismo", "Publicidad", "Comunicación audiovisual", "Relaciones Públicas", "Turismo", "Bibliotecología"],
+        "tecnicas": ["Publicista gráfico", "Locutor de radio y televisión", "Fotografía", "Guía turístico"]
+    },
+    "ARTE": {
+        "ocupaciones": ["Pintor", "Actor", "Escultor", "Decorador", "Diseñador de modas", "Director de cine y televisión", "Músico", "Profesor de música", "Arquitectura"],
+        "tecnicas": ["Artesanías en cerámica, cueros, tejido", "Técnico en dibujo lineal", "Ebanistería", "Decoración de Interiores", "Fotografía Profesional"]
+    },
+    "BURO": {
+        "ocupaciones": ["Bibliotecología"],
+        "tecnicas": ["Empleado de Oficina", "Bibliotecario", "Secretario(a)", "Archivero"]
+    },
+    "CCEP": {
+        "ocupaciones": ["Economista", "Estadista", "Político", "Diplomático", "Administrador de empresas", "Marketing"],
+        "tecnicas": ["Auxiliar de contabilidad", "Bancario", "Secretario contable", "Vendedor"]
+    },
+    "IIAA": {
+        "ocupaciones": ["Oficial del Ejército", "Oficial de la FAP", "Oficial de la Marina", "Oficial de la Policía"],
+        "tecnicas": ["CITEN", "ETE"]
+    },
+    "FINA": {
+        "ocupaciones": ["Contabilidad de finanzas", "Banca y seguros", "Administrador de empresas", "Marketing"],
+        "tecnicas": ["Auxiliar de contabilidad", "Bancario", "Secretario contable", "Vendedor", "Visitador médico"]
+    },
+    "LING": {
+        "ocupaciones": ["Escritor", "Lingüista", "Traductor e Intérprete de Idiomas"],
+        "tecnicas": ["Secretario Bilingüe"]
+    },
+    "JURI": {
+        "ocupaciones": ["Derecho (Penal, Civil, Laboral)", "Notario Público"],
+        "tecnicas": ["Escribano", "Secretario legal"]
+    }
+}
+
+def calculate_scores(responses: List[Dict]) -> Dict:
+    """Calculate scores for all scales based on responses"""
+    scores = {}
+    
+    for scale_code, scale_data in SCALE_MAPPING.items():
+        score = 0
+        
+        # Count A responses in column questions
+        for q_num in scale_data["column"]:
+            response = next((r for r in responses if r["question_number"] == q_num), None)
+            if response and "A" in response["response"]:
+                score += 1
+        
+        # Count B responses in row questions
+        for q_num in scale_data["row"]:
+            response = next((r for r in responses if r["question_number"] == q_num), None)
+            if response and "B" in response["response"]:
+                score += 1
+        
+        scores[scale_code] = {
+            "name": scale_data["name"],
+            "score": score,
+            "max_score": 22
+        }
+    
+    return scores
+
+def interpret_score(score: int, sex: str, scale_code: str) -> str:
+    """Interpret a score based on baremos"""
+    baremos = BAREMOS_VARONES if sex == "masculino" else BAREMOS_MUJERES
+    scale_baremos = baremos.get(scale_code, {})
+    
+    for category, (min_val, max_val) in scale_baremos.items():
+        if min_val <= score <= max_val:
+            return category
+    
+    return "indeciso"
+
+def get_recommendations(scores: Dict, sex: str) -> Dict:
+    """Get career recommendations based on scores"""
+    # Find top 3 scales
+    sorted_scales = sorted(scores.items(), key=lambda x: x[1]["score"], reverse=True)[:3]
+    
+    recommendations = []
+    for scale_code, scale_info in sorted_scales:
+        interpretation = interpret_score(scale_info["score"], sex, scale_code)
+        
+        # Only recommend if score is promedio_alto, alto, or muy_alto
+        if interpretation in ["promedio_alto", "alto", "muy_alto"]:
+            careers = CARRERAS.get(scale_code, {})
+            recommendations.append({
+                "scale": scale_code,
+                "name": scale_info["name"],
+                "score": scale_info["score"],
+                "interpretation": interpretation,
+                "ocupaciones": careers.get("ocupaciones", []),
+                "tecnicas": careers.get("tecnicas", [])
+            })
+    
+    return {
+        "top_scales": recommendations,
+        "all_scores": scores
+    }
+
+@app.get("/api/results/{session_id}")
+async def get_results(session_id: str):
+    """Calculate and return test results"""
+    try:
+        session = await db.test_sessions.find_one({"id": session_id})
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        responses = session.get("responses", [])
+        sex = session.get("sex", "masculino")
+        
+        # Calculate scores
+        scores = calculate_scores(responses)
+        
+        # Add interpretation to each score
+        for scale_code, scale_data in scores.items():
+            scale_data["interpretation"] = interpret_score(scale_data["score"], sex, scale_code)
+        
+        # Get recommendations
+        recommendations = get_recommendations(scores, sex)
+        
+        return {
+            "session_id": session_id,
+            "sex": sex,
+            "scores": scores,
+            "recommendations": recommendations,
+            "total_questions": 143,
+            "answered_questions": len(responses)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
