@@ -641,6 +641,7 @@ class BackendTester:
             self.test_get_test_session,
             self.test_complete_test,
             self.test_get_all_sessions,
+            self.test_results_calculation,
             self.test_error_cases
         ]
         
