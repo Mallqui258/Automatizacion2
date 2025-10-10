@@ -233,3 +233,5 @@ test_plan:
 agent_communication:
     - agent: "testing"
       message: "Comprehensive backend API testing completed successfully. All 6 main endpoints plus error handling tested with 100% pass rate. Created backend_test.py for future regression testing. MongoDB integration verified, UUIDs properly implemented, all response types supported. Backend is fully functional and ready for production use."
+    - agent: "testing"
+      message: "CASM-83 results calculation endpoint (GET /api/results/{session_id}) thoroughly tested and verified. All 11 psychological scales calculated correctly using proper algorithm (column A responses + row B responses). Sex-specific baremos working for both masculino and femenino. Career recommendation system functional - only recommends scales with high interpretations (promedio_alto, alto, muy_alto) and includes complete career information (ocupaciones and tecnicas). Scoring algorithm handles question overlaps correctly. All response fields present and properly formatted. Enhanced backend_test.py with comprehensive results testing. System ready for psychological assessment use."
