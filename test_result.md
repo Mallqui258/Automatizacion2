@@ -225,6 +225,7 @@ metadata:
 test_plan:
   current_focus:
     - "All backend API endpoints tested and verified"
+    - "CASM-83 results calculation endpoint tested and verified"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
