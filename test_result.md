@@ -201,6 +201,18 @@ backend:
           agent: "testing"
           comment: "✅ PASS: MongoDB connection working properly using MONGO_URL from environment. UUIDs are correctly used for session IDs (not ObjectIDs). Data persistence verified across all operations."
 
+  - task: "GET /api/results/{session_id} endpoint - CASM-83 scoring system"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ PASS: CASM-83 results calculation endpoint fully functional. All 11 scales (CCFM, CCSS, CCNA, CCCO, ARTE, BURO, CCEP, IIAA, FINA, LING, JURI) calculated correctly using column A + row B algorithm. Sex-specific baremos (masculino/femenino) properly applied for interpretations. Career recommendations working - only recommends scales with promedio_alto, alto, or muy_alto scores. Recommendations sorted by score and include ocupaciones and tecnicas arrays. Response structure includes all required fields: session_id, sex, scores, recommendations, total_questions, answered_questions. Comprehensive testing with strategic responses confirmed scoring accuracy and recommendation logic."
+
 frontend:
   # No frontend testing performed as per instructions
 
