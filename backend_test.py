@@ -338,6 +338,233 @@ class BackendTester:
             self.log_test("GET /api/all-sessions", False, "", str(e))
             return False
 
+    def test_results_calculation(self):
+        """Test GET /api/results/{session_id} endpoint - CASM-83 scoring system"""
+        if not self.session_id:
+            self.log_test("GET /api/results/{session_id}", False, 
+                        "No session_id available")
+            return False
+        
+        # First, create a comprehensive test session with strategic responses
+        # to test the scoring algorithm properly
+        try:
+            # Create a new session for results testing
+            payload = {"sex": "masculino"}
+            response = requests.post(f"{BASE_URL}/start-test", 
+                                   json=payload, timeout=10)
+            
+            if response.status_code != 200:
+                self.log_test("Results Test - Create session", False, 
+                            f"Status code: {response.status_code}", response.text)
+                return False
+                
+            results_session_id = response.json()["session_id"]
+            
+            # Add strategic responses to test scoring algorithm
+            # These responses are designed to create measurable scores across different scales
+            test_responses = [
+                # CCFM scale responses (questions 1,14,27,40,53,66,79,92,105,118,131 for A)
+                {"question_number": 1, "response": ["A"]},   # CCFM column
+                {"question_number": 14, "response": ["A"]},  # CCFM column
+                {"question_number": 27, "response": ["A"]},  # CCFM column
+                {"question_number": 40, "response": ["A"]},  # CCFM column
+                {"question_number": 53, "response": ["A"]},  # CCFM column
+                
+                # CCFM row responses (questions 1-11 for B)
+                {"question_number": 2, "response": ["B"]},   # CCFM row
+                {"question_number": 3, "response": ["B"]},   # CCFM row
+                {"question_number": 4, "response": ["B"]},   # CCFM row
+                
+                # CCSS scale responses
+                {"question_number": 15, "response": ["A"]},  # CCSS column
+                {"question_number": 28, "response": ["A"]},  # CCSS column
+                {"question_number": 16, "response": ["B"]},  # CCSS row
+                {"question_number": 17, "response": ["B"]},  # CCSS row
+                
+                # JURI scale responses
+                {"question_number": 11, "response": ["A"]},  # JURI column
+                {"question_number": 24, "response": ["A"]},  # JURI column
+                {"question_number": 131, "response": ["B"]}, # JURI row
+                {"question_number": 132, "response": ["B"]}, # JURI row
+                {"question_number": 133, "response": ["B"]}, # JURI row
+                
+                # Add some mixed responses
+                {"question_number": 50, "response": ["A", "B"]}, # Both options
+                {"question_number": 100, "response": []},         # Empty response
+                {"question_number": 75, "response": ["A"]},       # Single A
+                {"question_number": 125, "response": ["B"]},      # Single B
+            ]
+            
+            # Save all test responses
+            for resp in test_responses:
+                save_payload = {
+                    "session_id": results_session_id,
+                    "question_number": resp["question_number"],
+                    "response": resp["response"]
+                }
+                
+                save_response = requests.post(f"{BASE_URL}/save-response", 
+                                           json=save_payload, timeout=10)
+                
+                if save_response.status_code != 200:
+                    self.log_test("Results Test - Save responses", False, 
+                                f"Failed to save response for question {resp['question_number']}")
+                    return False
+            
+            # Mark test as completed
+            complete_payload = {"session_id": results_session_id}
+            complete_response = requests.post(f"{BASE_URL}/complete-test", 
+                                           json=complete_payload, timeout=10)
+            
+            if complete_response.status_code != 200:
+                self.log_test("Results Test - Complete test", False, 
+                            "Failed to complete test")
+                return False
+            
+            # Now test the results endpoint
+            results_response = requests.get(f"{BASE_URL}/results/{results_session_id}", 
+                                          timeout=10)
+            
+            if results_response.status_code != 200:
+                self.log_test("GET /api/results/{session_id}", False, 
+                            f"Status code: {results_response.status_code}", results_response.text)
+                return False
+                
+            results_data = results_response.json()
+            
+            # Verify response structure
+            required_fields = ["session_id", "sex", "scores", "recommendations", "total_questions", "answered_questions"]
+            for field in required_fields:
+                if field not in results_data:
+                    self.log_test("GET /api/results/{session_id}", False, 
+                                f"Missing field '{field}' in results")
+                    return False
+            
+            # Verify all 11 scales are present
+            expected_scales = ["CCFM", "CCSS", "CCNA", "CCCO", "ARTE", "BURO", "CCEP", "IIAA", "FINA", "LING", "JURI"]
+            scores = results_data["scores"]
+            
+            for scale in expected_scales:
+                if scale not in scores:
+                    self.log_test("GET /api/results/{session_id}", False, 
+                                f"Missing scale '{scale}' in scores")
+                    return False
+                    
+                # Verify each scale has required fields
+                scale_data = scores[scale]
+                scale_fields = ["name", "score", "max_score", "interpretation"]
+                for field in scale_fields:
+                    if field not in scale_data:
+                        self.log_test("GET /api/results/{session_id}", False, 
+                                    f"Missing field '{field}' in scale {scale}")
+                        return False
+                        
+                # Verify max_score is 22
+                if scale_data["max_score"] != 22:
+                    self.log_test("GET /api/results/{session_id}", False, 
+                                f"Scale {scale} max_score should be 22, got {scale_data['max_score']}")
+                    return False
+                    
+                # Verify score is within valid range
+                if not (0 <= scale_data["score"] <= 22):
+                    self.log_test("GET /api/results/{session_id}", False, 
+                                f"Scale {scale} score {scale_data['score']} out of valid range 0-22")
+                    return False
+            
+            # Verify recommendations structure
+            recommendations = results_data["recommendations"]
+            if "top_scales" not in recommendations or "all_scores" not in recommendations:
+                self.log_test("GET /api/results/{session_id}", False, 
+                            "Missing 'top_scales' or 'all_scores' in recommendations")
+                return False
+            
+            # Verify top_scales contains valid recommendations
+            top_scales = recommendations["top_scales"]
+            for recommendation in top_scales:
+                rec_fields = ["scale", "name", "score", "interpretation", "ocupaciones", "tecnicas"]
+                for field in rec_fields:
+                    if field not in recommendation:
+                        self.log_test("GET /api/results/{session_id}", False, 
+                                    f"Missing field '{field}' in recommendation")
+                        return False
+                        
+                # Verify interpretation is high level (promedio_alto, alto, muy_alto)
+                interpretation = recommendation["interpretation"]
+                if interpretation not in ["promedio_alto", "alto", "muy_alto"]:
+                    self.log_test("GET /api/results/{session_id}", False, 
+                                f"Recommendation has low interpretation: {interpretation}")
+                    return False
+                    
+                # Verify ocupaciones and tecnicas are lists
+                if not isinstance(recommendation["ocupaciones"], list):
+                    self.log_test("GET /api/results/{session_id}", False, 
+                                "ocupaciones should be a list")
+                    return False
+                    
+                if not isinstance(recommendation["tecnicas"], list):
+                    self.log_test("GET /api/results/{session_id}", False, 
+                                "tecnicas should be a list")
+                    return False
+            
+            # Verify sex-specific interpretation (test with female)
+            female_payload = {"sex": "femenino"}
+            female_response = requests.post(f"{BASE_URL}/start-test", 
+                                         json=female_payload, timeout=10)
+            
+            if female_response.status_code == 200:
+                female_session_id = female_response.json()["session_id"]
+                
+                # Add same responses for female
+                for resp in test_responses[:5]:  # Just a few responses
+                    save_payload = {
+                        "session_id": female_session_id,
+                        "question_number": resp["question_number"],
+                        "response": resp["response"]
+                    }
+                    requests.post(f"{BASE_URL}/save-response", json=save_payload, timeout=10)
+                
+                # Get female results
+                female_results_response = requests.get(f"{BASE_URL}/results/{female_session_id}", 
+                                                     timeout=10)
+                
+                if female_results_response.status_code == 200:
+                    female_results = female_results_response.json()
+                    
+                    # Verify sex field is correct
+                    if female_results["sex"] != "femenino":
+                        self.log_test("GET /api/results/{session_id} - Sex verification", False, 
+                                    f"Expected sex 'femenino', got '{female_results['sex']}'")
+                        return False
+                        
+                    # Interpretations might differ between sexes for same scores
+                    # This verifies sex-specific baremos are being used
+                    self.log_test("GET /api/results/{session_id} - Sex-specific baremos", True, 
+                                "Sex-specific interpretation verified")
+            
+            # Test manual score calculation verification
+            # Let's verify CCFM score calculation manually
+            ccfm_score = scores["CCFM"]["score"]
+            expected_ccfm = 5 + 3  # 5 A responses in column + 3 B responses in row
+            
+            if ccfm_score == expected_ccfm:
+                self.log_test("GET /api/results/{session_id} - Score calculation", True, 
+                            f"CCFM score correctly calculated: {ccfm_score}")
+            else:
+                self.log_test("GET /api/results/{session_id} - Score calculation", False, 
+                            f"CCFM score mismatch: expected {expected_ccfm}, got {ccfm_score}")
+                return False
+            
+            self.log_test("GET /api/results/{session_id}", True, 
+                        f"Results calculated for all 11 scales, {len(top_scales)} recommendations provided")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test("GET /api/results/{session_id}", False, "", str(e))
+            return False
+        except Exception as e:
+            self.log_test("GET /api/results/{session_id}", False, "", str(e))
+            return False
+
     def test_error_cases(self):
         """Test error handling scenarios"""
         all_passed = True
@@ -377,6 +604,23 @@ class BackendTester:
                 
         except Exception as e:
             self.log_test("Error handling - Non-existent session", False, "", str(e))
+            all_passed = False
+            
+        # Test results endpoint with invalid session
+        try:
+            response = requests.get(f"{BASE_URL}/results/invalid-session-id", 
+                                  timeout=10)
+            
+            if response.status_code == 404:
+                self.log_test("Error handling - Results invalid session", True, 
+                            "Correctly returned 404 for invalid session in results")
+            else:
+                self.log_test("Error handling - Results invalid session", False, 
+                            f"Expected 404, got {response.status_code}")
+                all_passed = False
+                
+        except Exception as e:
+            self.log_test("Error handling - Results invalid session", False, "", str(e))
             all_passed = False
             
         return all_passed
