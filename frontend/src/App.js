@@ -472,20 +472,45 @@ function App() {
             </div>
           </div>
 
-          {/* Botón de nuevo test */}
-          <button 
-            className="primary-btn"
-            onClick={() => {
-              setStage('start');
-              setSex('');
-              setSessionId('');
-              setResponses({});
-              setCurrentBlock(1);
-              setResults(null);
-            }}
-          >
-            Realizar Nuevo Test
-          </button>
+          {/* Botones de acción */}
+          <div className="action-buttons">
+            <button 
+              className="secondary-btn download-btn"
+              onClick={async () => {
+                try {
+                  const response = await fetch(`${BACKEND_URL}/api/results/${sessionId}/pdf`);
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `CASM83_Resultados_${sessionId.substring(0, 8)}.pdf`;
+                  document.body.appendChild(a);
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                  document.body.removeChild(a);
+                } catch (error) {
+                  console.error('Error downloading PDF:', error);
+                  alert('Error al descargar el PDF');
+                }
+              }}
+            >
+              📄 Descargar Resultados en PDF
+            </button>
+            
+            <button 
+              className="primary-btn"
+              onClick={() => {
+                setStage('start');
+                setSex('');
+                setSessionId('');
+                setResponses({});
+                setCurrentBlock(1);
+                setResults(null);
+              }}
+            >
+              Realizar Nuevo Test
+            </button>
+          </div>
         </div>
       </div>
     );
