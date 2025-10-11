@@ -547,3 +547,184 @@ async def get_results(session_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+def generate_pdf(session_id: str, sex: str, scores: Dict, recommendations: Dict) -> BytesIO:
+    """Generate PDF report with test results"""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    
+    # Container for PDF elements
+    elements = []
+    
+    # Styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor('#667eea'),
+        spaceAfter=30,
+        alignment=TA_CENTER,
+        fontName='Helvetica-Bold'
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=16,
+        textColor=colors.HexColor('#333333'),
+        spaceAfter=12,
+        spaceBefore=12,
+        fontName='Helvetica-Bold'
+    )
+    
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.HexColor('#555555'),
+        spaceAfter=6
+    )
+    
+    # Title
+    elements.append(Paragraph("CASM-83 R2014", title_style))
+    elements.append(Paragraph("Inventario de Intereses Vocacionales y Ocupacionales", normal_style))
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Session info
+    elements.append(Paragraph(f"<b>ID de Sesión:</b> {session_id}", normal_style))
+    elements.append(Paragraph(f"<b>Sexo:</b> {'Masculino' if sex == 'masculino' else 'Femenino'}", normal_style))
+    elements.append(Paragraph(f"<b>Fecha:</b> {datetime.now(timezone.utc).strftime('%d/%m/%Y %H:%M')}", normal_style))
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Results table
+    elements.append(Paragraph("Resultados por Escala", heading_style))
+    
+    # Interpretation labels
+    interp_labels = {
+        'desinteres': 'Desinterés',
+        'bajo': 'Bajo',
+        'promedio_bajo': 'Promedio Bajo',
+        'indeciso': 'Indeciso',
+        'promedio': 'Promedio',
+        'promedio_alto': 'Promedio Alto',
+        'alto': 'Alto',
+        'muy_alto': 'Muy Alto'
+    }
+    
+    # Create table data
+    table_data = [['Escala', 'Puntuación', 'Interpretación']]
+    
+    for scale_code, scale_info in scores.items():
+        interpretation = interp_labels.get(scale_info['interpretation'], scale_info['interpretation'])
+        table_data.append([
+            scale_info['name'],
+            f"{scale_info['score']}/22",
+            interpretation
+        ])
+    
+    # Create table
+    results_table = Table(table_data, colWidths=[3.5*inch, 1*inch, 1.5*inch])
+    results_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 10),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+    ]))
+    
+    elements.append(results_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Recommendations
+    if recommendations['top_scales'] and len(recommendations['top_scales']) > 0:
+        elements.append(PageBreak())
+        elements.append(Paragraph("Recomendaciones Profesionales", heading_style))
+        elements.append(Paragraph("Basado en tus resultados, estas son las áreas donde mostraste mayor interés:", normal_style))
+        elements.append(Spacer(1, 0.2*inch))
+        
+        for i, rec in enumerate(recommendations['top_scales'], 1):
+            # Recommendation header
+            rec_title = f"{i}. {rec['name']}"
+            elements.append(Paragraph(rec_title, heading_style))
+            
+            score_text = f"<b>Puntuación:</b> {rec['score']}/22 - {interp_labels.get(rec['interpretation'], rec['interpretation'])}"
+            elements.append(Paragraph(score_text, normal_style))
+            elements.append(Spacer(1, 0.1*inch))
+            
+            # Professional careers
+            if rec.get('ocupaciones') and len(rec['ocupaciones']) > 0:
+                elements.append(Paragraph("<b>Carreras Profesionales:</b>", normal_style))
+                for career in rec['ocupaciones']:
+                    elements.append(Paragraph(f"• {career}", normal_style))
+                elements.append(Spacer(1, 0.1*inch))
+            
+            # Technical careers
+            if rec.get('tecnicas') and len(rec['tecnicas']) > 0:
+                elements.append(Paragraph("<b>Carreras Técnicas:</b>", normal_style))
+                for career in rec['tecnicas']:
+                    elements.append(Paragraph(f"• {career}", normal_style))
+                elements.append(Spacer(1, 0.1*inch))
+            
+            elements.append(Spacer(1, 0.2*inch))
+    
+    # Footer
+    elements.append(Spacer(1, 0.5*inch))
+    footer_style = ParagraphStyle(
+        'Footer',
+        parent=styles['Normal'],
+        fontSize=8,
+        textColor=colors.HexColor('#999999'),
+        alignment=TA_CENTER
+    )
+    elements.append(Paragraph("Este documento es un reporte automático generado por el sistema CASM-83 R2014", footer_style))
+    elements.append(Paragraph(f"Generado el {datetime.now(timezone.utc).strftime('%d/%m/%Y a las %H:%M UTC')}", footer_style))
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
+@app.get("/api/results/{session_id}/pdf")
+async def download_results_pdf(session_id: str):
+    """Generate and download PDF report with test results"""
+    try:
+        session = await db.test_sessions.find_one({"id": session_id})
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        responses = session.get("responses", [])
+        sex = session.get("sex", "masculino")
+        
+        # Calculate scores
+        scores = calculate_scores(responses)
+        
+        # Add interpretation to each score
+        for scale_code, scale_data in scores.items():
+            scale_data["interpretation"] = interpret_score(scale_data["score"], sex, scale_code)
+        
+        # Get recommendations
+        recommendations = get_recommendations(scores, sex)
+        
+        # Generate PDF
+        pdf_buffer = generate_pdf(session_id, sex, scores, recommendations)
+        
+        # Return PDF as streaming response
+        return StreamingResponse(
+            pdf_buffer,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=CASM83_Resultados_{session_id[:8]}.pdf"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
