@@ -433,9 +433,7 @@ mongoexport --db=casm83 --collection=test_sessions --type=csv --fields=id,sex,co
 4. Selecciona la colección `test_sessions`
 5. Exporta como JSON, CSV o BSON
 
----
 
-¿Necesitas ayuda con algún paso específico o tienes alguna pregunta sobre la configuración? 😊
 ---
 
 ## 📊 Resumen Ejecutivo
