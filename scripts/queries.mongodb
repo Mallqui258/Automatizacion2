@@ -1,0 +1,240 @@
+// MongoDB Playground para consultas en VSCode
+// Usa la extensión "MongoDB for VS Code"
+// Para ejecutar: Ctrl+Shift+P > "MongoDB: Run Query"
+
+// Seleccionar base de datos
+use('casm83');
+
+// ===============================================
+// CONSULTAS BÁSICAS
+// ===============================================
+
+// 1. Ver todas las sesiones
+db.test_sessions.find();
+
+// 2. Ver solo 5 sesiones
+db.test_sessions.find().limit(5);
+
+// 3. Contar total de sesiones
+db.test_sessions.countDocuments();
+
+// ===============================================
+// FILTROS
+// ===============================================
+
+// 4. Ver solo sesiones masculinas
+db.test_sessions.find({ sex: 'masculino' });
+
+// 5. Ver solo sesiones femeninas
+db.test_sessions.find({ sex: 'femenino' });
+
+// 6. Ver solo sesiones completadas
+db.test_sessions.find({ completed: true });
+
+// 7. Ver sesiones NO completadas
+db.test_sessions.find({ completed: false });
+
+// 8. Buscar por ID específico
+db.test_sessions.findOne({ 
+  id: 'tu-session-id-aqui' 
+});
+
+// ===============================================
+// PROYECCIONES (Seleccionar campos específicos)
+// ===============================================
+
+// 9. Ver solo ID y sexo
+db.test_sessions.find(
+  {},
+  { id: 1, sex: 1, _id: 0 }
+);
+
+// 10. Ver sesiones sin las respuestas (más rápido)
+db.test_sessions.find(
+  {},
+  { responses: 0 }
+);
+
+// ===============================================
+// ORDENAMIENTO
+// ===============================================
+
+// 11. Ordenar por fecha de creación (más reciente primero)
+db.test_sessions.find().sort({ created_at: -1 });
+
+// 12. Ordenar por fecha de creación (más antigua primero)
+db.test_sessions.find().sort({ created_at: 1 });
+
+// ===============================================
+// AGREGACIONES (Análisis de Datos)
+// ===============================================
+
+// 13. Contar sesiones por sexo
+db.test_sessions.aggregate([
+  {
+    $group: {
+      _id: '$sex',
+      total: { $sum: 1 }
+    }
+  }
+]);
+
+// 14. Promedio de respuestas por sesión
+db.test_sessions.aggregate([
+  {
+    $project: {
+      sex: 1,
+      numResponses: { $size: '$responses' }
+    }
+  },
+  {
+    $group: {
+      _id: '$sex',
+      promedioRespuestas: { $avg: '$numResponses' }
+    }
+  }
+]);
+
+// 15. Sesiones completadas vs no completadas
+db.test_sessions.aggregate([
+  {
+    $group: {
+      _id: '$completed',
+      total: { $sum: 1 }
+    }
+  }
+]);
+
+// 16. Últimas 10 sesiones creadas
+db.test_sessions.find()
+  .sort({ created_at: -1 })
+  .limit(10)
+  .project({ id: 1, sex: 1, created_at: 1, completed: 1 });
+
+// ===============================================
+// ANÁLISIS DE RESPUESTAS
+// ===============================================
+
+// 17. Ver cuántas respuestas tiene cada sesión
+db.test_sessions.aggregate([
+  {
+    $project: {
+      id: 1,
+      sex: 1,
+      totalRespuestas: { $size: '$responses' }
+    }
+  },
+  {
+    $sort: { totalRespuestas: -1 }
+  }
+]);
+
+// 18. Sesiones con menos de 143 respuestas (incompletas)
+db.test_sessions.aggregate([
+  {
+    $project: {
+      id: 1,
+      sex: 1,
+      totalRespuestas: { $size: '$responses' },
+      completed: 1
+    }
+  },
+  {
+    $match: {
+      totalRespuestas: { $lt: 143 }
+    }
+  }
+]);
+
+// ===============================================
+// ACTUALIZACIONES
+// ===============================================
+
+// 19. Marcar una sesión como completada
+// db.test_sessions.updateOne(
+//   { id: 'tu-session-id-aqui' },
+//   { 
+//     $set: { 
+//       completed: true,
+//       completed_at: new Date().toISOString()
+//     } 
+//   }
+// );
+
+// 20. Actualizar el sexo de una sesión
+// db.test_sessions.updateOne(
+//   { id: 'tu-session-id-aqui' },
+//   { $set: { sex: 'femenino' } }
+// );
+
+// ===============================================
+// ELIMINACIONES (¡CUIDADO!)
+// ===============================================
+
+// 21. Eliminar una sesión específica
+// db.test_sessions.deleteOne({ id: 'tu-session-id-aqui' });
+
+// 22. Eliminar todas las sesiones NO completadas
+// db.test_sessions.deleteMany({ completed: false });
+
+// 23. Eliminar TODAS las sesiones (¡CUIDADO!)
+// db.test_sessions.deleteMany({});
+
+// ===============================================
+// CONSULTAS AVANZADAS
+// ===============================================
+
+// 24. Buscar sesiones creadas en las últimas 24 horas
+db.test_sessions.find({
+  created_at: {
+    $gte: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  }
+});
+
+// 25. Estadísticas completas
+db.test_sessions.aggregate([
+  {
+    $facet: {
+      totalSesiones: [{ $count: 'count' }],
+      porSexo: [
+        {
+          $group: {
+            _id: '$sex',
+            total: { $sum: 1 }
+          }
+        }
+      ],
+      completadas: [
+        {
+          $match: { completed: true }
+        },
+        {
+          $count: 'count'
+        }
+      ],
+      promedioRespuestas: [
+        {
+          $project: {
+            numResponses: { $size: '$responses' }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            promedio: { $avg: '$numResponses' }
+          }
+        }
+      ]
+    }
+  }
+]);
+
+// ===============================================
+// EXPORTAR RESULTADOS
+// ===============================================
+
+// Para exportar, usa desde la terminal:
+// mongoexport --db=casm83 --collection=test_sessions --out=backup.json
+
+// Para importar:
+// mongoimport --db=casm83 --collection=test_sessions --file=backup.json
