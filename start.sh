@@ -16,5 +16,6 @@ npm ci --include=dev
 # Compila
 npm run build
 
+ls -la build || true
 # Arranca el servidor Express escuchando en 0.0.0.0:PORT
 exec node server.js
