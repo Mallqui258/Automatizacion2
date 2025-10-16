@@ -1,21 +1,24 @@
-#!/usr/bin/env bash
+#!/bin/sh
+set -eu
 
-set -euo pipefail
+echo "--- START.SH RUNNING ---"
+echo "Shell: $(ps -p $$ -o comm= 2>/dev/null || echo unknown)"
+echo "Pwd: $(pwd)"
 
-#ir al directorio del frontend
+# Ir a la carpeta del frontend
 cd "$(dirname "$0")/frontend"
+echo "Now in: $(pwd)"
+echo "Node: $(node -v)  NPM: $(npm -v)"
 
-
-# Info útil en logs
-echo "Node: $(node -v)"
-echo "NPM:  $(npm -v)"
-
-# Instala dependencias (incluye dev por CRACO)
+# Instala deps (incluye dev por CRACO)
 npm ci --include=dev
 
 # Compila
 npm run build
 
+# Verifica que exista el build
+echo "Build content:"
 ls -la build || true
-# Arranca el servidor Express escuchando en 0.0.0.0:PORT
+
+# Arranca Express (frontend/server.js)
 exec node server.js
