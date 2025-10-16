@@ -5,29 +5,16 @@ set -euo pipefail
 #ir al directorio del frontend
 cd "$(dirname "$0")/frontend"
 
-# INFO útil en logs
-#echo "Node: $(node -v)"
-#echo "NPM:  $(npm -v)"
 
-#instalar dependencias (incluyendo dev)
-#npm ci --include=dev
+# Info útil en logs
+echo "Node: $(node -v)"
+echo "NPM:  $(npm -v)"
 
-#compilar la aplicacion
-#npm run build
+# Instala dependencias (incluye dev por CRACO)
+npm ci --include=dev
 
-# Servir en 0.0.0.0:<PORT o 3000> (necesario para que el dominio público conecte)
-#exec npx serve -s build -l "tcp://0.0.0.0:${PORT:-3000}"
+# Compila
+npm run build
 
-
-
-#Se comenta para evitar errores en despliegue
-
-if [ -f "yarn.lock" ]; then
-    corepack enable || true
-    yarn install --frozen-lockfile
-else
-    npm ci
-fi
-
-npm run build || yarn build
-npx serve -s build -l $PORT
+# Arranca el servidor Express escuchando en 0.0.0.0:PORT
+exec node server.js
