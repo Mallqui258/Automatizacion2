@@ -1,0 +1,9 @@
+{
+  "name": "automatizacion2-root",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "npm --prefix frontend ci --include=dev && npm --prefix frontend run build",
+    "start": "node frontend/server.js"
+  }
+}
